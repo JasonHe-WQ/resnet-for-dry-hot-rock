@@ -23,7 +23,7 @@ class ModifiedResNet50(nn.Module):
 
 def init_model(model_load_path,val_loader):
     model = ModifiedResNet50().cuda()
-    model.compile()
+    # model.compile()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.00001, weight_decay=0.01)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5000, gamma=0.1)
