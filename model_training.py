@@ -5,7 +5,10 @@ import torch.optim as optim
 from torchvision import models
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cuda.matmul.allow_tf32 = True
 
 class ModifiedResNet50(nn.Module):
     def __init__(self):
@@ -20,13 +23,11 @@ class ModifiedResNet50(nn.Module):
     def forward(self, x):
         return self.resnet50(x)
 
-
 def init_model(model_load_path,val_loader):
     model = ModifiedResNet50().cuda()
-    # model.compile()
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.00001, weight_decay=0.01)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5000, gamma=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.01)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.1)
     try:
         model.load_state_dict(torch.load(model_load_path))
         model.eval()
@@ -44,13 +45,15 @@ def init_model(model_load_path,val_loader):
         best_val_loss = float('inf')
         print(e)
         print("Training without loading weights")
-    print("initialization finished")
+    print("Initialization finished")
     return model, criterion, optimizer, scheduler, best_val_loss
-
 
 def train_and_validate_model(model, train_loader, val_loader,
                              criterion, optimizer, scheduler,
                              best_model_save_path,best_val_loss,num_epochs=8000,):
+    train_losses = []
+    val_losses = []
+
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0.0
@@ -78,12 +81,25 @@ def train_and_validate_model(model, train_loader, val_loader,
 
         avg_train_loss = train_loss / len(train_loader)
         avg_val_loss = val_loss / len(val_loader)
+        train_losses.append(avg_train_loss)
+        val_losses.append(avg_val_loss)
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             torch.save(model.state_dict(), best_model_save_path)
 
         print(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {avg_train_loss}, Val Loss: {avg_val_loss}")
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(train_losses, label='Training loss')
+    plt.plot(val_losses, label='Validation loss')
+    plt.title('Loss vs. Epochs')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('loss_curve.png')
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -107,8 +123,8 @@ if __name__ == '__main__':
     dataset = dataset.CustomDataset(data_files, label_files)
 
     train_dataset, val_dataset = train_test_split(dataset, test_size=0.2, random_state=42)
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=224, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=224, shuffle=False)
     model, criterion, optimizer, scheduler, best_val_loss = init_model('./best_model.pth',val_loader)
     train_and_validate_model(model, train_loader, val_loader, criterion, optimizer, scheduler,
                              best_model_save_path='./best_model.pth', best_val_loss=best_val_loss, num_epochs=8000)

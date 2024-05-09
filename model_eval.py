@@ -6,18 +6,21 @@ from sklearn.metrics import precision_recall_fscore_support
 from torch.utils.data import DataLoader
 import dataset
 
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cuda.matmul.allow_tf32 = True
 
-def eval_model(dataset,model_path):
+
+def eval_model(dataset, model_path):
     # 加载数据
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=False)
-    model, criterion, _, _, _ = model_training.init_model(model_path,dataloader)
+    dataloader = DataLoader(dataset, batch_size=128, shuffle=False)
+    model, criterion, _, _, _ = model_training.init_model(model_path, dataloader)
     model.eval()
     val_loss = 0.0
     all_labels = []
     all_preds = []
     cnt = 0
     with torch.no_grad():
-        for inputs,labels in dataloader:
+        for inputs, labels in dataloader:
             inputs_cuda, labels_cuda = inputs.cuda(), labels.cuda()
             inputs_cuda = inputs_cuda.unsqueeze(1).to(torch.float32)
             outputs = model(inputs_cuda)
@@ -54,6 +57,7 @@ if __name__ == '__main__':
                    './0dB_modify/0dB_modify-labels.csv']
     dataset = dataset.CustomDataset(data_files, label_files)
     startTime = time.time()
-    eval_model(dataset=dataset,model_path='./best_model.pth')
+    eval_model(dataset=dataset, model_path='./best_model.pth')
     endTime = time.time()
     print(f"Time elapsed: {endTime - startTime} seconds")
+    print(" Average time per sample: ", (endTime - startTime) / len(dataset) * 1000, "ms")
